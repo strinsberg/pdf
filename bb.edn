@@ -26,5 +26,5 @@
 
          clean {:doc "Remove the build directory."
                 :task (do (println "Removing build...")
-                          (fs/delete-tree "build" {:keys [force]})
+                          (fs/delete-tree "build")
                           (fs/create-dir "build"))}}}

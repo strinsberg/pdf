@@ -37,3 +37,4 @@ bin
 .cache
 .lsp
 .clj-kondo
+.clangd

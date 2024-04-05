@@ -1,4 +1,5 @@
-#include "pdf.h"
+#include "pdf_parser.h"
+#include <zlib.h>
 #include <iostream>
 #include <vector>
 
