@@ -45,7 +45,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAK
 enable_testing()
 add_executable(test_${PROJECT_NAME} ${PDFCLI_TESTS})
 target_link_libraries(test_${PROJECT_NAME} ${PROJECT_NAME}_lib)
-target_link_libraries(${PROJECT_NAME} ZLIB::ZLIB)
+target_link_libraries(test_${PROJECT_NAME} ZLIB::ZLIB)
 target_link_libraries(test_${PROJECT_NAME} gtest gmock gtest_main)
 set_target_properties(test_${PROJECT_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
