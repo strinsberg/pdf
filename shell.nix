@@ -3,7 +3,7 @@
 pkgs.mkShell {
 
   nativeBuildInputs = with pkgs; [
-    cmake pkg-config clang clang-tools
+    cmake pkg-config clang clang-tools pdf-parser
   ];
 
   buildInputs = with pkgs; [
