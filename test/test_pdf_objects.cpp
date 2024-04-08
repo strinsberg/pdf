@@ -92,10 +92,10 @@ TEST(PdfDict, DoesItWriteItsValueToTheStream) {
 
 TEST(PdfStream, DoesItWriteItsValueToTheStream) {
   PdfStream obj;
-  obj.dict.pairs[PdfName("/First")] = new PdfNull();
-  obj.dict.pairs[PdfName("/Second")] = new PdfBool(false);
-  obj.dict.pairs[PdfName("/Third")] = new PdfString("Hello");
-  obj.dict.pairs[PdfName("/Fourth")] = new PdfReal(42.05);
+  obj.dict->pairs[PdfName("/First")] = new PdfNull();
+  obj.dict->pairs[PdfName("/Second")] = new PdfBool(false);
+  obj.dict->pairs[PdfName("/Third")] = new PdfString("Hello");
+  obj.dict->pairs[PdfName("/Fourth")] = new PdfReal(42.05);
   obj.stream = {'H', 'e', 'l', 'l', 'o', ',', ' ',
                 'W', 'o', 'r', 'l', 'd', '!'};
 

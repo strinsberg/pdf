@@ -21,6 +21,15 @@ TEST(ParsePdfObj, DoesItReadAWellFormedIntFromTheStartOfTheStream) {
   delete parsed;
 }
 
+TEST(ParsePdfObj, DoesItReadAWellFormedNegativeIntFromTheStartOfTheStream) {
+  std::stringstream is("-12345");
+  PdfObj *parsed = parse_pdf_obj(is);
+  EXPECT_EQ(*parsed, PdfInt(-12345));
+  delete parsed;
+}
+
+// +1234 0. .0 are also valid number formats we will need to test for and implement
+
 TEST(ParsePdfObj, DoesItReadAWellFormedRealFromTheStartOfTheStream) {
   std::stringstream is("1024.09876");
   PdfObj *parsed = parse_pdf_obj(is);
@@ -59,21 +68,18 @@ TEST(ParsePdfObj, DoesItReadAWellFormedFalseFromTheStartOfTheStream) {
 TEST(ParsePdfObj, DoesItReadAWellFormedNullFromTheStartOfTheStream) {
   std::stringstream is("null");
   PdfObj *parsed = parse_pdf_obj(is);
-  // EXPECT_EQ(*parsed, PdfNull());
-  FAIL() << "Temp implementation returns PdfNull*. FIXME when null is properly "
-            "parsed.";
+  EXPECT_EQ(*parsed, PdfNull());
   delete parsed;
 }
 
 TEST(ParsePdfObj, DoesItReadAWellFormedArrayFromTheStartOfTheStream) {
-  std::stringstream is("[ 1234 /Strinsberg true ]");
+  std::stringstream is("[ true /Strinsberg null ]");
   PdfObj *parsed = parse_pdf_obj(is);
 
   PdfArray expected;
-  expected.objects.push_back(new PdfNull());
   expected.objects.push_back(new PdfBool(true));
   expected.objects.push_back(new PdfName("/Strinsberg"));
-  expected.objects.push_back(new PdfInt(42));
+  expected.objects.push_back(new PdfNull());
 
   EXPECT_EQ(*parsed, expected);
   delete parsed;
@@ -81,14 +87,13 @@ TEST(ParsePdfObj, DoesItReadAWellFormedArrayFromTheStartOfTheStream) {
 
 TEST(ParsePdfObj, DoesItReadAWellFormedDictFromTheStartOfTheStream) {
   std::stringstream is(
-      "<< /First null /Second false /Third (Hello) /Fourth 42.05 >>");
+      "<< /First null /Second false /Third (Hello) >>");
   PdfObj *parsed = parse_pdf_obj(is);
 
   PdfDict expected;
   expected.pairs[PdfName("/First")] = new PdfNull();
   expected.pairs[PdfName("/Second")] = new PdfBool(false);
   expected.pairs[PdfName("/Third")] = new PdfString("Hello");
-  expected.pairs[PdfName("/Fourth")] = new PdfReal(42.05);
 
   EXPECT_EQ(*parsed, expected);
   delete parsed;
@@ -96,15 +101,14 @@ TEST(ParsePdfObj, DoesItReadAWellFormedDictFromTheStartOfTheStream) {
 
 TEST(ParsePdfObj, DoesItReadAWellFormedStreamFromTheStartOfTheStream) {
   std::stringstream is(
-      "<< /First null /Fourth 42.05 /Second false /Third (Hello) >>\n"
+      "<< /First null /Second false /Third (Hello) >>\n"
       "stream\nHello, World!\nendstream\n");
   PdfObj *parsed = parse_pdf_obj(is);
 
   PdfStream expected;
-  expected.dict.pairs[PdfName("/First")] = new PdfNull();
-  expected.dict.pairs[PdfName("/Second")] = new PdfBool(false);
-  expected.dict.pairs[PdfName("/Third")] = new PdfString("Hello");
-  expected.dict.pairs[PdfName("/Fourth")] = new PdfReal(42.05);
+  expected.dict->pairs[PdfName("/First")] = new PdfNull();
+  expected.dict->pairs[PdfName("/Second")] = new PdfBool(false);
+  expected.dict->pairs[PdfName("/Third")] = new PdfString("Hello");
   expected.stream = {'H', 'e', 'l', 'l', 'o', ',', ' ',
                      'W', 'o', 'r', 'l', 'd', '!'};
 

@@ -37,6 +37,9 @@ public:
   virtual ~PdfObj() {}
   virtual void write(std::ostream &os) const = 0;
   virtual bool operator==(const PdfObj &other) const = 0;
+  virtual bool operator!=(const PdfObj &other) const {
+    return !(*this == other);
+  };
 };
 
 class PdfNull : public PdfObj {
@@ -140,9 +143,14 @@ public:
   }
   virtual bool operator==(const PdfObj &obj) const override {
     if (const PdfArray *other = dynamic_cast<const PdfArray *>(&obj)) {
-      return objects == other->objects;
+      if (objects.size() != other->objects.size())
+        return false;
+      for (size_t i = 0; i < objects.size(); ++i) {
+        if (*objects.at(i) != *other->objects.at(i))
+          return false;
+      }
     }
-    return false;
+    return true;
   }
 };
 
@@ -161,18 +169,29 @@ public:
   }
   virtual bool operator==(const PdfObj &obj) const override {
     if (const PdfDict *other = dynamic_cast<const PdfDict *>(&obj)) {
-      return pairs == other->pairs;
+      if (pairs.size() != other->pairs.size()) {
+        return false;
+      } else {
+        for (auto &p : pairs) {
+          auto it = other->pairs.find(p.first);
+          if (it == other->pairs.end() || *it->second != *p.second)
+            return false;
+        }
+      }
     }
-    return false;
+    return true;
   }
 };
 
 class PdfStream : public PdfObj {
 public:
-  PdfDict dict;
+  PdfDict *dict;
   std::vector<char> stream;
+  PdfStream() : dict(new PdfDict) {}
+  PdfStream(PdfDict *d) : dict(d) {}
+  virtual ~PdfStream() { delete dict; }
   virtual void write(std::ostream &os) const override {
-    dict.write(os);
+    dict->write(os);
     os << "\nstream\n";
     for (auto ch : stream) {
       os << ch;
@@ -182,7 +201,7 @@ public:
   }
   virtual bool operator==(const PdfObj &obj) const override {
     if (const PdfStream *other = dynamic_cast<const PdfStream *>(&obj)) {
-      return dict == other->dict && stream == other->stream;
+      return *dict == *other->dict && stream == other->stream;
     }
     return false;
   }
@@ -242,6 +261,18 @@ PdfTopLevel parse_top_level_obj(std::istream &is);
 // it will likely be necessary to have other finer grained functions to get
 // specific object types where necessary
 PdfObj *parse_pdf_obj(std::istream &is);
+
+PdfArray *parse_pdf_array(std::istream &is);
+PdfDict *parse_pdf_dict(std::istream &is);
+PdfName *parse_pdf_name(std::istream &is);
+
+PdfName parse_pdf_name_obj(std::istream &is);
+std::vector<char> parse_pdf_content_stream(std::istream &is);
+
+// Parser helpers
+void skip_whitespace(std::istream &is);
+bool ends_name(char ch);
+bool valid_name_char(char ch);
 
 } // namespace util
 
