@@ -264,9 +264,9 @@ PdfObj *parse_pdf_obj(std::istream &is);
 
 PdfArray *parse_pdf_array(std::istream &is);
 PdfDict *parse_pdf_dict(std::istream &is);
-PdfName *parse_pdf_name(std::istream &is);
 
 PdfName parse_pdf_name_obj(std::istream &is);
+std::string get_name_token(std::istream& is);
 std::vector<char> parse_pdf_content_stream(std::istream &is);
 
 // Parser helpers

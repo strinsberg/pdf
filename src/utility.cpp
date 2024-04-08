@@ -201,20 +201,7 @@ util::PdfObj *util::parse_pdf_obj(std::istream &is) {
     }
     return new PdfString(token);
   case '/': // should start a name
-    while (true) {
-      is.get(in);
-      if (is.eof()) {
-        break;
-      } else if (ends_name(in)) {
-        is.unget();
-        break;
-      } else if (!valid_name_char(in)) {
-        throw std::runtime_error(
-            std::string("Parse Error: Invalid char in PDF name: ") + in);
-      }
-      token += in;
-    }
-    return new PdfName(token);
+    return new PdfName(get_name_token(is));
   case '<': // should start a dict (we will add hex strings later)
     is.get(in);
     if (in == '<') {
@@ -288,13 +275,6 @@ util::PdfArray *util::parse_pdf_array(std::istream &is) {
   }
 }
 
-util::PdfName *util::parse_pdf_name(std::istream &is) {
-  PdfName *name;
-  *name = parse_pdf_name_obj(is);
-  std::cout << name << std::endl;
-  return name;
-}
-
 util::PdfName util::parse_pdf_name_obj(std::istream &is) {
   std::string name("/");
   char in;
@@ -303,6 +283,12 @@ util::PdfName util::parse_pdf_name_obj(std::istream &is) {
     throw std::runtime_error(
         std::string("Parse Error: Pdf names must start with /, Got ") + in);
 
+  return PdfName(get_name_token(is));
+}
+
+std::string util::get_name_token(std::istream &is) {
+  std::string token("/");
+  char in;
   while (true) {
     is.get(in);
     if (is.eof()) {
@@ -314,9 +300,9 @@ util::PdfName util::parse_pdf_name_obj(std::istream &is) {
       throw std::runtime_error(
           std::string("Parse Error: Invalid char in PDF name: ") + in);
     }
-    name += in;
+    token += in;
   }
-  return PdfName(name);
+  return token;
 }
 
 util::PdfDict *util::parse_pdf_dict(std::istream &is) {
