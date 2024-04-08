@@ -36,11 +36,18 @@ class PdfObj {
 public:
   virtual ~PdfObj() {}
   virtual void write(std::ostream &os) const = 0;
+  virtual bool operator==(const PdfObj &other) const = 0;
 };
 
 class PdfNull : public PdfObj {
 public:
   virtual void write(std::ostream &os) const override { os << "null"; }
+  virtual bool operator==(const PdfObj &other) const override {
+    if (const PdfNull *null = dynamic_cast<const PdfNull *>(&other)) {
+      return true;
+    }
+    return false;
+  }
 };
 
 class PdfString : public PdfObj {
@@ -49,6 +56,12 @@ public:
   PdfString(const std::string &s) : data(s) {}
   virtual void write(std::ostream &os) const override {
     os << "(" << data << ")";
+  }
+  virtual bool operator==(const PdfObj &obj) const override {
+    if (const PdfString *other = dynamic_cast<const PdfString *>(&obj)) {
+      return data == other->data;
+    }
+    return false;
   }
 };
 
@@ -59,6 +72,12 @@ public:
   virtual void write(std::ostream &os) const override { os << data; }
   bool operator<(const PdfName &other) const { return data < other.data; }
   bool operator<(const PdfName &other) { return data < other.data; }
+  virtual bool operator==(const PdfObj &obj) const override {
+    if (const PdfName *other = dynamic_cast<const PdfName *>(&obj)) {
+      return data == other->data;
+    }
+    return false;
+  }
 };
 
 class PdfInt : public PdfObj {
@@ -66,6 +85,12 @@ public:
   int64_t data;
   PdfInt(int64_t i) : data(i) {}
   virtual void write(std::ostream &os) const override { os << data; }
+  virtual bool operator==(const PdfObj &obj) const override {
+    if (const PdfInt *other = dynamic_cast<const PdfInt *>(&obj)) {
+      return data == other->data;
+    }
+    return false;
+  }
 };
 
 class PdfReal : public PdfObj {
@@ -75,6 +100,12 @@ public:
   virtual void write(std::ostream &os) const override {
     os << std::setprecision(15) << data;
   }
+  virtual bool operator==(const PdfObj &obj) const override {
+    if (const PdfReal *other = dynamic_cast<const PdfReal *>(&obj)) {
+      return data == other->data;
+    }
+    return false;
+  }
 };
 
 class PdfBool : public PdfObj {
@@ -83,6 +114,12 @@ public:
   PdfBool(bool b) : data(b) {}
   virtual void write(std::ostream &os) const override {
     os << (data ? "true" : "false");
+  }
+  virtual bool operator==(const PdfObj &obj) const override {
+    if (const PdfBool *other = dynamic_cast<const PdfBool *>(&obj)) {
+      return data == other->data;
+    }
+    return false;
   }
 };
 
@@ -101,6 +138,12 @@ public:
     }
     os << "]";
   }
+  virtual bool operator==(const PdfObj &obj) const override {
+    if (const PdfArray *other = dynamic_cast<const PdfArray *>(&obj)) {
+      return objects == other->objects;
+    }
+    return false;
+  }
 };
 
 class PdfDict : public PdfObj {
@@ -115,6 +158,12 @@ public:
       os << " ";
     }
     os << ">>";
+  }
+  virtual bool operator==(const PdfObj &obj) const override {
+    if (const PdfDict *other = dynamic_cast<const PdfDict *>(&obj)) {
+      return pairs == other->pairs;
+    }
+    return false;
   }
 };
 
@@ -131,6 +180,12 @@ public:
     // Should this start with an endline? or would that mess up compression
     os << "\nendstream\n";
   }
+  virtual bool operator==(const PdfObj &obj) const override {
+    if (const PdfStream *other = dynamic_cast<const PdfStream *>(&obj)) {
+      return dict == other->dict && stream == other->stream;
+    }
+    return false;
+  }
 };
 
 class PdfRef : public PdfObj {
@@ -141,10 +196,16 @@ public:
   virtual void write(std::ostream &os) const override {
     os << num << " " << gen << " R";
   }
+  virtual bool operator==(const PdfObj &obj) const override {
+    if (const PdfRef *other = dynamic_cast<const PdfRef *>(&obj)) {
+      return num == other->num && gen == other->gen;
+    }
+    return false;
+  }
 };
 
 // This is the object for an object with a number generation and a PdfObj
-class PdfTopLevel : PdfObj {
+class PdfTopLevel : public PdfObj {
 public:
   int64_t num;
   int64_t gen;
@@ -152,11 +213,20 @@ public:
   PdfTopLevel(int64_t n, int64_t g, PdfObj *o) : num(n), gen(g), obj(o) {}
   virtual ~PdfTopLevel() { delete obj; }
   virtual void write(std::ostream &os) const override {
-      os << num << " " << gen << " obj\n";
-      obj->write(os);
-      os << "\nendobj\n";
+    os << num << " " << gen << " obj\n";
+    obj->write(os);
+    os << "\nendobj\n";
+  }
+  virtual bool operator==(const PdfObj &obj) const override {
+    if (const PdfTopLevel *other = dynamic_cast<const PdfTopLevel *>(&obj)) {
+      return num == other->num && gen == other->gen && this->obj == other->obj;
     }
+    return false;
+  }
 };
+
+std::ostream &operator<<(std::ostream &os, const util::PdfObj &obj);
+std::ostream &operator<<(std::ostream &os, const util::PdfObj *const obj);
 
 // NOTE the functions below are just prototypes and should go in the parser
 // class once it is proper. I don't really know enough about the PDF format

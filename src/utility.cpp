@@ -106,32 +106,18 @@ std::vector<char> util::inflate_stream(std::istream &is, std::streamoff size) {
 
 // Prototypes /////////////////////////////////////////////////////////////////
 
-/* There are several types of pdfobjects to parse
- *
- * 1. a top level object that has a object number, generation number, and is
- * wrapped in obj endobj. This may not really count as an object, but since it
- * has some data associated with it other than the object inside it seems to be
- * best represented on it's own, or many objects would have empty values for
- * that data.
- *
- * 2. Strings wrapped in () or hex strings wrapped in <>
- * 3. Numbers as integer or real
- * 4. Boolean true or false
- * 5. Indirect references <num> <gen> R
- * 6. Arrays wrapped in [] that can contain any of 2-7
- * 7. Dictionaries wrapped in << >> with name keys and object values
- * 8. Names which are /SomeName, / by itself can be a valid name
- * 9. Streams. These start with a dictionary and are preceded by strea/endstream
- *
- * To tell the difference between a dict and a stream you have to parse the
- * dict first and then see if it has a stream keyword after it.
- *
- */
+std::ostream &util::operator<<(std::ostream &os, const util::PdfObj &obj) {
+  obj.write(os);
+  return os;
+}
+
+std::ostream &util::operator<<(std::ostream &os, const util::PdfObj *const obj) {
+  obj->write(os);
+  return os;
+}
 
 util::PdfTopLevel util::parse_top_level_obj(std::istream &is) {
   return PdfTopLevel(0, 0, new PdfNull());
 }
 
-util::PdfObj* util::parse_pdf_obj(std::istream &is) {
-  return new PdfNull();
-}
+util::PdfObj *util::parse_pdf_obj(std::istream &is) { return new PdfNull(); }
