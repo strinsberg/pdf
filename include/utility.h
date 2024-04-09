@@ -238,7 +238,7 @@ public:
   }
   virtual bool operator==(const PdfObj &obj) const override {
     if (const PdfTopLevel *other = dynamic_cast<const PdfTopLevel *>(&obj)) {
-      return num == other->num && gen == other->gen && this->obj == other->obj;
+      return num == other->num && gen == other->gen && *this->obj == *other->obj;
     }
     return false;
   }
@@ -254,9 +254,6 @@ std::ostream &operator<<(std::ostream &os, const util::PdfObj *const obj);
 // without worrying about architecture and then work on putting them into
 // a nice class with a good interface later.
 
-// parse a pdf object "num gen obj ... endobj"
-PdfTopLevel parse_top_level_obj(std::istream &is);
-
 // parse any object and return a pointer to it
 // it will likely be necessary to have other finer grained functions to get
 // specific object types where necessary
@@ -264,9 +261,13 @@ PdfObj *parse_pdf_obj(std::istream &is);
 
 PdfArray *parse_pdf_array(std::istream &is);
 PdfDict *parse_pdf_dict(std::istream &is);
+PdfObj* parse_pdf_int_or_real(std::istream &is);
+PdfObj* parse_pdf_num_ref_or_top_level(std::istream &is);
 
 PdfName parse_pdf_name_obj(std::istream &is);
 std::string get_name_token(std::istream& is);
+bool parse_int(std::istream &is, int64_t* i);
+bool parse_double(std::istream &is, double* d);
 std::vector<char> parse_pdf_content_stream(std::istream &is);
 
 // Parser helpers

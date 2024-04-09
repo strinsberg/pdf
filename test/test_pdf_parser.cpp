@@ -17,7 +17,7 @@ namespace util {
 TEST(ParsePdfObj, DoesItReadAWellFormedIntFromTheStartOfTheStream) {
   std::stringstream is("1024");
   PdfObj *parsed = parse_pdf_obj(is);
-  EXPECT_EQ(*parsed, PdfInt(1029));
+  EXPECT_EQ(*parsed, PdfInt(1024));
   delete parsed;
 }
 

@@ -118,10 +118,6 @@ std::ostream &util::operator<<(std::ostream &os,
   return os;
 }
 
-util::PdfTopLevel util::parse_top_level_obj(std::istream &is) {
-  return PdfTopLevel(0, 0, new PdfNull());
-}
-
 // For now I am going to put all logic for parsing pdf objects into this
 // function in a proper parser some of the decisions about what what objects to
 // parse from the stream might be context dependent. E.g. if we are parsing the
@@ -143,15 +139,20 @@ util::PdfTopLevel util::parse_top_level_obj(std::istream &is) {
 // you can accurately test for whitespace.
 
 util::PdfObj *util::parse_pdf_obj(std::istream &is) {
-  // what are the starting chars for many types
-  // < starts << or is followed by a hex digit for <F4...>
-  // ( starts a string
-  // / starts a name
-  // t and f start bools
-  // [ starts an array
-  // a digit starts a number, a reference, or a top level object, this could
-  // be dependent on context.
-  // - starts a negative number
+  // TODO replace the switch with if statments so that local variables can
+  // be initialized in the blocks rather than shared, and to help prevent
+  // errors like the one I had parsing names where code jumped up the switch.
+  // TODO make sure to deal with EOF in all the parsing functions
+  // TODO instead of collecting characters and then calling is.unget() I think
+  // it might be better to use is.peek(). It is possible that either is fine,
+  // but there is always a danger of calling unget too many times, and by
+  // using peek we can write logic that checks the next char and allows a
+  // separate function to fully parse the token expecting that the first char
+  // is the first char, making them usable in different contexts.
+  // TODO extract as much parsing logic as is possible into separate functions
+  // to tame the length and unruliness of this function. It is also nice to be
+  // able to call all individual parsing functions in other contexts, were we
+  // to want to parse each object type specifically.
   char in;
   std::string token;
   size_t len;
@@ -203,6 +204,7 @@ util::PdfObj *util::parse_pdf_obj(std::istream &is) {
   case '/': // should start a name
     return new PdfName(get_name_token(is));
   case '<': // should start a dict (we will add hex strings later)
+    // TODO extract this into a function
     is.get(in);
     if (in == '<') {
       is.unget();
@@ -232,17 +234,19 @@ util::PdfObj *util::parse_pdf_obj(std::istream &is) {
   case '-': // should start a number -/+123 -/+123.456 .90 etc.
   case '+':
   case '.':
-    break;
-  case 0: // Digits start numbers, refs, or obj/endobj
-  case 1:
-  case 2:
-  case 3:
-  case 4:
-  case 5:
-  case 6:
-  case 7:
-  case 9:
-    break;
+    is.unget();
+    return parse_pdf_int_or_real(is);
+  case '0': // Digits start numbers, refs, or obj/endobj
+  case '1':
+  case '2':
+  case '3':
+  case '4':
+  case '5':
+  case '6':
+  case '7':
+  case '9':
+    is.unget();
+    return parse_pdf_num_ref_or_top_level(is);
   default: // if we see anything else it is an error in the doc or the parser
     throw std::runtime_error(
         std::string("Parse Error: Unexpected char to start a PDF object: ") +
@@ -352,6 +356,14 @@ std::vector<char> util::parse_pdf_content_stream(std::istream &is) {
 
   std::string line;
   while (!is.eof()) {
+    // TODO consider if this is the right way to iterate till finding endstream
+    // The problem is that if I iterate bytes I have to manually check the next
+    // n chars at every point where I encounter something starting with any
+    // of the chars in endstream. string::find() handles this really well,
+    // except that it makes a copy of the data with getline and then copies it
+    // again into the result. If I kept track myself then I would just be
+    // peeking and copying data into the vector without copying the whole line.
+    // but it would add a bunch of if statements to the code below.
     getline(is, line);
     auto pos = line.find("endstream");
     if (pos == std::string::npos) {
@@ -362,6 +374,120 @@ std::vector<char> util::parse_pdf_content_stream(std::istream &is) {
     }
   }
   return contents;
+}
+
+bool util::parse_int(std::istream &is, int64_t *i) {
+  int64_t in;
+  // TODO be sure that it is better to use the stream operation to try and
+  // parse an int than to use stoi or some other method.
+  if (is >> in) {
+    *i = in;
+    return true;
+  } else {
+    is.clear();
+    return false;
+  }
+}
+
+bool util::parse_double(std::istream &is, double *d) {
+  double in;
+  // TODO be sure that it is better to use the stream operation to try and
+  // parse an int than to use stoi or some other method.
+  if (is >> in) {
+    *d = in;
+    return true;
+  } else {
+    is.clear();
+    return false;
+  }
+}
+
+util::PdfObj *util::parse_pdf_int_or_real(std::istream &is) {
+  int64_t i;
+  double d;
+
+  // Try int first as it will happily put an int into a double
+  if (parse_int(is, &i) && (isspace(is.peek()) || is.eof())) {
+    return new PdfInt(i);
+  } else if (parse_double(is, &d) && (isspace(is.peek()) || is.eof())) {
+    return new PdfReal(d);
+  } else {
+    is.clear();
+    std::string token;
+    is >> token;
+    throw std::runtime_error(std::string("Parse Error: Failed to parse an int "
+                                         "or real from the stream: Got ") +
+                             token);
+  }
+}
+
+util::PdfObj *util::parse_pdf_num_ref_or_top_level(std::istream &is) {
+  int64_t num;
+  double d;
+  std::streampos begin = is.tellg();
+
+  // TODO is whitespace the only valid thing to find after an int?
+  if (parse_int(is, &num) && (isspace(is.peek()) || is.eof())) {
+    int64_t gen;
+    std::streampos pos_after_num = is.tellg();
+    if (parse_int(is, &gen) && (isspace(is.peek()) || is.eof())) {
+      char ch;
+      is >> ch;
+      if (ch == 'R') {
+        return new PdfRef(num, gen);
+      } else if (ch == 'o') {
+        // check we actually have obj
+        std::string token("o");
+        for (size_t i = 0; i < 2; ++i) {
+          is >> ch;
+          token += ch;
+        }
+
+        if (token == "obj") {
+          PdfObj *obj = parse_pdf_obj(is);
+          token = "";
+          for (size_t i = 0; i < 6; i++) {
+            is >> ch;
+            token += ch;
+          }
+          if (token == "endobj") {
+            return new PdfTopLevel(num, gen, obj);
+          } else {
+            throw std::runtime_error(
+                std::string("Parse Error: Top level PDF objects must be closed "
+                            "by endobj, Got ") +
+                token);
+          }
+        }
+        // if we don't find obj fall through, other parsers will catch the
+        // error
+      }
+      // If we didn't find o or R after the two ints then just fall through
+    }
+
+    // we did not find an ref or object, so return the first int
+    // and reset the stream to after the first int
+    is.clear();
+    is.seekg(pos_after_num, std::ios_base::beg);
+    return new PdfInt(num);
+  }
+
+  // Since we started with a digit we might still have a real
+  is.clear();
+  is.seekg(begin, std::ios_base::beg);
+
+  if (parse_double(is, &d) && (isspace(is.peek()) || is.eof())) {
+    return new PdfReal(d);
+  } else {
+    is.clear();
+    is.seekg(begin, std::ios_base::beg);
+    std::string token;
+    is >> token;
+    throw std::runtime_error(
+        std::string(
+            "Parse Error: Failed to parse a number from the stream: Got ") +
+        token);
+  }
 }
 
 bool util::ends_name(char ch) {
