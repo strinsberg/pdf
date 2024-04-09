@@ -20,14 +20,11 @@ std::vector<char> slurp_bytes(const std::string &filename);
 // restores the current position in the stream
 std::vector<char> inflate_stream(std::istream &is, std::streamoff);
 
-// Prototype Stuff ////////////////////////////////////////////////////////////
+// Object Prototypes //////////////////////////////////////////////////////////
+
 // I am going to prototype some types and parsing functions in here to keep
 // experimentation simple. I will move them to proper files and classes and
 // make them more robust when things stabalize a bit.
-
-// NOTE I am going to stash some object classes in here for now too while
-// I prototype. They should be in their own files once we figure out how to
-// set them up properly.
 
 // Abstract class for all pdf objects, keeping everything public for now until
 // things are more settled and I can make them more robust without having to
@@ -223,7 +220,13 @@ public:
   }
 };
 
-// This is the object for an object with a number generation and a PdfObj
+// TODO This should be renamed indirect object instead
+// TODO can these be presented as obj num gen <object> endobj ??? if so then
+// I will need to add some logic to make both possible.
+// NOTE these should only be able to appear in 2 places, as top level objects
+// in the document or in a stream where the /Type is /ObjStream. Current
+// parsing does not care and would happily parse one in the middle of an array
+// so it will be necessary to provide this context at some point.
 class PdfTopLevel : public PdfObj {
 public:
   int64_t num;
@@ -238,14 +241,27 @@ public:
   }
   virtual bool operator==(const PdfObj &obj) const override {
     if (const PdfTopLevel *other = dynamic_cast<const PdfTopLevel *>(&obj)) {
-      return num == other->num && gen == other->gen && *this->obj == *other->obj;
+      return num == other->num && gen == other->gen &&
+             *this->obj == *other->obj;
     }
     return false;
   }
 };
 
+// TODO consider how we will represent the cross-reference table and/or the
+// trailer. Should they be separate types in a pdf document, or should they
+// be a kind of pdf object that can be determined by it's dictionary values.
+// In my example PDF the xref is just an indirect object stream object and has
+// the /Type /XRef. It could be possible to parse this as an object stream and
+// to then compose a new type that holds a PdfTopLevel (or whatever I rename it)
+// as a memeber and operates on it, or caches a decompressed version of the
+// stream. Or we could parse the object and use it to fill in the values for
+// a specific xref type and discard the indirect obect.
+
 std::ostream &operator<<(std::ostream &os, const util::PdfObj &obj);
 std::ostream &operator<<(std::ostream &os, const util::PdfObj *const obj);
+
+// Parser Prototypes //////////////////////////////////////////////////////////
 
 // NOTE the functions below are just prototypes and should go in the parser
 // class once it is proper. I don't really know enough about the PDF format
@@ -261,13 +277,13 @@ PdfObj *parse_pdf_obj(std::istream &is);
 
 PdfArray *parse_pdf_array(std::istream &is);
 PdfDict *parse_pdf_dict(std::istream &is);
-PdfObj* parse_pdf_int_or_real(std::istream &is);
-PdfObj* parse_pdf_num_ref_or_top_level(std::istream &is);
+PdfObj *parse_pdf_int_or_real(std::istream &is);
+PdfObj *parse_pdf_num_ref_or_top_level(std::istream &is);
 
 PdfName parse_pdf_name_obj(std::istream &is);
-std::string get_name_token(std::istream& is);
-bool parse_int(std::istream &is, int64_t* i);
-bool parse_double(std::istream &is, double* d);
+std::string get_name_token(std::istream &is);
+bool parse_int(std::istream &is, int64_t *i);
+bool parse_double(std::istream &is, double *d);
 std::vector<char> parse_pdf_content_stream(std::istream &is);
 
 // Parser helpers
